@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <style>
+         #customers {
+         font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+         border-collapse: collapse;
+         width: 100%;
+         }
+         td, th {
+         border: 1px solid #ddd;
+         padding: 8px;
+         text-align: right;
+         }
+         tr:nth-child(even){background-color: #f2f2f2;}
+         tr:hover {background-color: #ddd;}
+         th {
+         padding-top: 12px;
+         padding-bottom: 12px;
+         text-align: right;
+         background-color: #4CAF50;
+         color: white;
+         }
+         body {
+         background-color: #FFFFFF;
+         }
+         h1 {
+         color: rgb(0, 0, 0);
+         text-align: center;
+         }
+         p {
+         font-family: verdana;
+         font-size: 20px;
+         }
+      </style>
+   </head>
+   <body>
+      <h1>AG-Spiel Ad-hoc Analytics</h1>
+
+      <h2>Marktüberblick</h2>
+      <p id="info000">aktualisiere...</p>
+      <p id="rep_000_markt"></p>
+
+      <h2>Anleihebuch der Systembank</h2>
+      <p id="info001">aktualisiere...</p>
+      <p id="rep_001_anleihebuch"></p>
+
+      <h2>Fremdkapitalfälligkeiten</h2>
+      <p id="info004">aktualisiere...</p>
+      <p id="rep_004_liabilities"></p>
+
+      <h2>Depot Systembank</h2>
+      <p id="info005">aktualisiere...</p>
+      <p id="rep_005_depot_systembank"></p>
+
+      <h2>TOP 20 AGs with lowest spreads</h2>
+      <p id="info002">aktualisiere...</p>
+      <p id="rep_002_low_spreads"></p>
+
+      <h2>TOP 10 AGs with lowest/highest valuation relative to cash/bond positon</h2>
+      <p id="info003">aktualisiere...</p>
+      <p id="rep_003_low_valuation"></p>
+      
+      <script>
+         function currencyFormatDE(num) {
+         return (
+           num
+             .toFixed(2) // always two decimal digits
+             .replace('.', ',') // replace decimal point character with ,
+             .replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.') + ' €'
+         ) // use . as a separator
+         };
+         
+         function report000_markt(data){
+           //calcultate some figures
+           var bargeld = 0;
+           var marktkapitalisierung = 0;
+           var anleihen = 0;
+           var erw_zinsertrag = 0;
+           var kredite = 0;
+           var erw_zinsaufwand = 0;
+           var ag;
+           var bond;
+           var loan;
+           for (ag in data.ags){
+                 //console.log("wkn "+ag)
+                 marktkapitalisierung += data['ags'][ag]['aktienanzahl']*data['ags'][ag]['kurs']
+                 //console.log(marktkapitalisierung)
+                 bargeld += data['ags'][ag]['bargeld']
+         
+                 for (bond in data['ags'][ag]['anleihen']){
+                   ////console.log([bond,isNaN(data['ags'][ag]['anleihen'][bond]['betrag']),isNaN(data['ags'][ag]['anleihen'][bond]['zins']),isNaN(data['ags'][ag]['anleihen'][bond]['laufzeit'])])
+                   betrag = data['ags'][ag]['anleihen'][bond]['betrag']
+                   zins = data['ags'][ag]['anleihen'][bond]['zins']
+                   laufzeit = data['ags'][ag]['anleihen'][bond]['laufzeit']
+                   
+                   anleihen += betrag
+         //            anleihe_buch[ag+"_"+bond] = data['ags'][ag]['anleihen'][bond]
+                   
+                   zinsertrag = ((betrag*(1+zins/100)**laufzeit)-betrag)
+                   erw_zinsertrag += zinsertrag
+                   
+                 }
+                 //console.log(anleihen)
+                 //console.log(erw_zinsertrag)
+         
+                 for (loan in data['ags'][ag]['kredite']){
+                   betrag = data['ags'][ag]['kredite'][loan]['betrag']
+                   zins = data['ags'][ag]['kredite'][loan]['zins']
+                   laufzeit = data['ags'][ag]['kredite'][loan]['laufzeit']
+                   
+                   kredite += betrag
+                   
+                   erw_zinsaufwand += ((betrag*(1+zins/100)**laufzeit)-betrag)
+                   
+                 }
+           };
+         
+           //generate output table
+           var txt_rep000;
+           txt_rep000  = "<table><tr><th>Kennzahl</th><th >Wert</th></tr>";
+           txt_rep000 += "<tr><td>AGs</td><td>" + data.allgemein.ags.toLocaleString('de') + "</td></tr>";
+           txt_rep000 += "<tr><td>Anzahl Orders in den letzten 24 Stunden</td><td>" + data.allgemein["24_stunden_orders"].toLocaleString('de') + "</td></tr>";
+           txt_rep000 += "<tr><td>Ordervolumen in den letzten 24 Stunden</td><td>" + currencyFormatDE(data.allgemein["24_stunden_ordervolumen"]) + "</td></tr>";
+           txt_rep000 += "<tr><td>Marktkapitalisierung</td><td>" + currencyFormatDE(marktkapitalisierung) + "</td></tr>";
+           txt_rep000 += "<tr><td>Bargeldbestände</td><td>" + currencyFormatDE(bargeld) + "</td></tr>";
+           txt_rep000 += "<tr><td>Gehaltende Anleihen</td><td>" + currencyFormatDE(anleihen)+ "</td></tr>";
+           txt_rep000 += "<tr><td>Erwartete Zinserträge</td><td>" + currencyFormatDE(erw_zinsertrag) + "</td></tr>";
+           txt_rep000 += "<tr><td>Fremdkapitaleinsatz</td><td>" + currencyFormatDE(kredite) + "</td></tr>";
+           txt_rep000 += "<tr><td>Fremdkapitalkosten</td><td>" + currencyFormatDE(erw_zinsaufwand) + "</td></tr>";
+           txt_rep000 += "</table>";
+           document.getElementById("info000").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+           document.getElementById("rep_000_markt").innerHTML = txt_rep000;
+         };
+         
+         function report001_anleihebuch(data){
+           var anleihen = 0;
+           var erw_zinsertrag = 0;
+           var kredite = 0;
+           var erw_zinsaufwand = 0;
+           var ag;
+           var bond;
+           var loan;
+           var anleihe_buch = {};
+           var anleihe_report = {};
+           var dates = [];
+           var datum;
+           for (ag in data.ags){
+             
+             for (bond in data['ags'][ag]['anleihen']){
+               anleihe_buch[ag+"_"+bond] = data['ags'][ag]['anleihen'][bond]  
+             }
+           }
+           for (bond in anleihe_buch){
+             //console.log("cycle "+bond )
+             datum = anleihe_buch[bond]['auszahlung_datum'].substring(0,10)
+         
+             betrag = anleihe_buch[bond]['betrag']
+             zins = anleihe_buch[bond]['zins']
+             laufzeit = anleihe_buch[bond]['laufzeit']
+             zinsertrag = ((betrag*(1+zins/100)**laufzeit)-betrag)
+             anleihen += betrag
+             erw_zinsertrag += zinsertrag
+             if (dates.indexOf(datum) == -1){
+               dates.push(datum)
+               anleihe_report[datum] = [betrag, zinsertrag, betrag + zinsertrag]
+             }
+             else{
+               //anleihe_report[datum] += [betrag, zinsertrag, betrag + zinsertrag]
+               anleihe_report[datum] = anleihe_report[datum].map(function (num, idx) {
+                 return num + [betrag, zinsertrag, betrag + zinsertrag][idx]; 
+               })
+             }
+                     
+           }
+           //console.log(anleihe_report)
+           var txt_rep001;
+           txt_rep001 = "<table>"
+           txt_rep001 += "<tr><th>Datum der Rückzahlung</th><th>Tilgung</th><th>Zinsen</th><th>Gesamt</th></tr>" 
+           for (date in dates.sort()){
+             //console.log(date, dates[date],anleihe_report[dates[date]])
+             txt_rep001 += "<tr><td>"+dates[date]+"</td><td>"+
+               currencyFormatDE(anleihe_report[dates[date]][0]) + "</td><td>" +
+               currencyFormatDE(anleihe_report[dates[date]][1]) + "</td><td>" +
+               currencyFormatDE(anleihe_report[dates[date]][2]) + "</td></tr>"
+             //console.log(dates[date])
+             //console.log(anleihe_report[dates[date]])
+           }
+           txt_rep001 += "<tr><th>Total</th><th>" +
+             currencyFormatDE(anleihen) + "</th><th>" +
+             currencyFormatDE(erw_zinsertrag) + "</th><th>" +
+             currencyFormatDE(anleihen + erw_zinsertrag) + "</th></tr></table>"
+             
+           document.getElementById("info001").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+           document.getElementById("rep_001_anleihebuch").innerHTML = txt_rep001
+         
+         };
+         
+         function report002_low_spreads(data){
+         var briefkurs;
+               var geldkurs;
+               var spreads = [];
+               for (ag in data.ags){
+                 briefkurs = data['ags'][ag]['brief']
+                 geldkurs = data['ags'][ag]['geld']
+                 userprojekt = data['ags'][ag]['ceo']['ist_userprojekt_account']
+                 if (briefkurs != 0 && geldkurs != 0 && ! userprojekt){
+                   spreads.push([ag,data['ags'][ag]['name'],((briefkurs - geldkurs)*100/geldkurs).toFixed(5)]) 
+                 }
+               }
+               spreads.sort(function(a, b){return a[2] - b[2]})
+               var tmp_link;
+               var text = "<table>";
+         
+               text += "<tr><th>Platz</th><th>WKN</th><th>Name</th><th>Spread in %</th></tr>"
+                 for (i = 0; i < 20; i++) {
+                   tmp_link = "https://www.ag-spiel.de/index.php?section=profil&aktie="+ spreads[i][0];
+                   text += "<tr><td>"+ (i+1) + "</td><td> <a href="+tmp_link + "target='_blank'>"+spreads[i][0]+"</a></td><td> <a href="+tmp_link + "target='_blank'>"+spreads[i][1]+"</a></td><td> " + spreads[i][2] + "</td></tr>";
+                 }
+                 text += "</table>";
+                 document.getElementById("info002").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+                 document.getElementById("rep_002_low_spreads").innerHTML = text
+         };
+         function report003_low_valuation(data){
+
+          var txt_rep003;
+          //calcultate some figures
+          var bargeld = 0;
+           var marktkapitalisierung = 0;
+           var anleihen = 0;
+           var erw_zinsertrag = 0;
+           var kredite = 0;
+           var erw_zinsaufwand = 0;
+           var ag;
+           var bond;
+           var loan;
+           var ag_value_list = [];
+           for (ag in data.ags){
+                 //console.log("wkn "+ag)
+                 marktkapitalisierung = data['ags'][ag]['aktienanzahl']*data['ags'][ag]['kurs']
+                 //console.log(marktkapitalisierung)
+                 bargeld = data['ags'][ag]['bargeld'];
+                 anleihen = 0;
+                 erw_zinsertrag = 0;
+                 kredite = 0;
+                 erw_zinsaufwand = 0;
+                 for (bond in data['ags'][ag]['anleihen']){
+                   ////console.log([bond,isNaN(data['ags'][ag]['anleihen'][bond]['betrag']),isNaN(data['ags'][ag]['anleihen'][bond]['zins']),isNaN(data['ags'][ag]['anleihen'][bond]['laufzeit'])])
+                   betrag = data['ags'][ag]['anleihen'][bond]['betrag']
+                   zins = data['ags'][ag]['anleihen'][bond]['zins']
+                   laufzeit = data['ags'][ag]['anleihen'][bond]['laufzeit']
+                   
+                   anleihen += betrag
+         //            anleihe_buch[ag+"_"+bond] = data['ags'][ag]['anleihen'][bond]
+                   
+                   zinsertrag = ((betrag*(1+zins/100)**laufzeit)-betrag)
+                   erw_zinsertrag += zinsertrag
+                   
+                 }
+                 //console.log(anleihen)
+                 //console.log(erw_zinsertrag)
+         
+                 for (loan in data['ags'][ag]['kredite']){
+                   betrag = data['ags'][ag]['kredite'][loan]['betrag']
+                   zins = data['ags'][ag]['kredite'][loan]['zins']
+                   laufzeit = data['ags'][ag]['kredite'][loan]['laufzeit']
+                   
+                   kredite += betrag
+                   
+                   erw_zinsaufwand += ((betrag*(1+zins/100)**laufzeit)-betrag)
+                   
+                 }
+                 if (! data['ags'][ag]['ceo']['ist_userprojekt_account'] && ! data['ags'][ag]['in_liquidation']){
+                  ag_value_list.push([ag, 
+                    data['ags'][ag]['name'], 
+                    data['ags'][ag]['kurs'],
+                    marktkapitalisierung, 
+                    bargeld, 
+                    anleihen,
+                    erw_zinsertrag,
+                    kredite,
+                    erw_zinsaufwand,
+                    (marktkapitalisierung-(bargeld + anleihen+erw_zinsertrag - kredite - erw_zinsaufwand))/marktkapitalisierung]);
+                 }
+           };
+           ag_value_list.sort(function(a, b){return a[9] - b[9]})
+               var tmp_link;
+               var txt_rep003 = "<table>";
+         
+                txt_rep003 += "<tr>"
+                txt_rep003 += "<th>Platz</th>"
+                txt_rep003 += "<th>WKN</th>"
+                txt_rep003 += "<th>Name</th>"
+                txt_rep003 += "<th>letzter Kurs</th>"
+                txt_rep003 += "<th>Marktkapitalisierung</th>"
+                txt_rep003 += "<th>Bargeldbestand</th>"
+                txt_rep003 += "<th>Anleihen</th>"
+                txt_rep003 += "<th>erw. Erträge aus Anleihen</th>"
+                txt_rep003 += "<th>Fremdkapital</th>"
+                txt_rep003 += "<th>Fremdkapitalkosten</th>"
+                txt_rep003 += "<th>Bewertung soft Assets</th>"
+                txt_rep003 += "</tr>"
+                 for (i = 0; i < 20; i++) {
+                   tmp_link = "https://www.ag-spiel.de/index.php?section=profil&aktie="+ ag_value_list[i][0];
+                   txt_rep003 += "<tr><td>"+ (i+1) +
+                    "</td><td> <a href="+tmp_link + "target='_blank'>"+ag_value_list[i][0]
+                    +"</a></td><td> <a href="+tmp_link + "target='_blank'>"+ag_value_list[i][1]
+                    +"</a></td><td> " + currencyFormatDE(ag_value_list[i][2]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][3]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][4]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][5]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][6]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][7]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][8]) + "</td>"
+                    +"<td> " + ag_value_list[i][9].toFixed(5) + "</td>"
+                    + "</tr>";
+                 }
+                 txt_rep003 += "</table>";
+
+                 ag_value_list.sort(function(a, b){return b[9] - a[9]})
+                txt_rep003 += "<h2>Top 10 (extrem) high valuation</h2>";
+                txt_rep003 += "<p>Zuletzt aktualisiert: " + data.daten_datum +"</p>";
+                txt_rep003 += "<table>";
+         
+                txt_rep003 += "<tr>"
+                txt_rep003 += "<th>Platz</th>"
+                txt_rep003 += "<th>WKN</th>"
+                txt_rep003 += "<th>Name</th>"
+                txt_rep003 += "<th>letzter Kurs</th>"
+                txt_rep003 += "<th>Marktkapitalisierung</th>"
+                txt_rep003 += "<th>Bargeldbestand</th>"
+                txt_rep003 += "<th>Anleihen</th>"
+                txt_rep003 += "<th>erw. Erträge aus Anleihen</th>"
+                txt_rep003 += "<th>Fremdkapital</th>"
+                txt_rep003 += "<th>Fremdkapitalkosten</th>"
+                txt_rep003 += "<th>Bewertung soft Assets</th>"
+                txt_rep003 += "</tr>"
+                 for (i = 0; i < 20; i++) {
+                   tmp_link = "https://www.ag-spiel.de/index.php?section=profil&aktie="+ ag_value_list[i][0];
+                   txt_rep003 += "<tr><td>"+ (i+1) +
+                    "</td><td> <a href="+tmp_link + "target='_blank'>"+ag_value_list[i][0]
+                    +"</a></td><td> <a href="+tmp_link + "target='_blank'>"+ag_value_list[i][1]
+                    +"</a></td><td> " + currencyFormatDE(ag_value_list[i][2]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][3]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][4]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][5]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][6]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][7]) + "</td>"
+                    +"<td> " + currencyFormatDE(ag_value_list[i][8]) + "</td>"
+                    +"<td> " + ag_value_list[i][9].toFixed(5) + "</td>"
+                    + "</tr>";
+                 }
+                 txt_rep003 += "</table>";
+
+
+          document.getElementById("info003").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+          document.getElementById("rep_003_low_valuation").innerHTML = txt_rep003
+          
+         };
+
+         function report004_kreditbuch(data){
+           var kredite = 0;
+           var zinsen = 0;
+           var erw_zinsaufwand = 0;
+           var ag;
+           var loan;
+           var kredit_buch = {};
+           var kredit_report = {};
+           var dates = [];
+           var datum;
+           for (ag in data.ags){
+             
+             for (loan in data['ags'][ag]['kredite']){
+              kredit_buch[ag+"_"+loan] = data['ags'][ag]['kredite'][loan]  
+             }
+           }
+           for (loan in kredit_buch){
+             //console.log("cycle "+loan )
+             datum = kredit_buch[loan]['rueckzahlung_datum'].substring(0,10)
+         
+             betrag = kredit_buch[loan]['betrag']
+             zins = kredit_buch[loan]['zins']
+             laufzeit = kredit_buch[loan]['laufzeit']
+             zinsen = ((betrag*(1+zins/100)**laufzeit)-betrag)
+             kredite += betrag
+             erw_zinsaufwand += zinsen
+             if (dates.indexOf(datum) == -1){
+               dates.push(datum)
+               kredit_report[datum] = [betrag, zinsen, betrag + zinsen]
+             }
+             else{
+               //kredit_report[datum] += [betrag, zinsen, betrag + zinsen]
+               kredit_report[datum] = kredit_report[datum].map(function (num, idx) {
+                 return num + [betrag, zinsen, betrag + zinsen][idx]; 
+               })
+             }
+                     
+           }
+           //console.log(kredit_report)
+           var txt_rep004;
+           txt_rep004 = "<table>"
+            txt_rep004 += "<tr><th>Datum der Rückzahlung</th><th>Tilgung</th><th>Zinsen</th><th>Gesamt</th></tr>" 
+           for (date in dates.sort()){
+             //console.log(date, dates[date],kredit_report[dates[date]])
+             txt_rep004 += "<tr><td>"+dates[date]+"</td><td>"+
+               currencyFormatDE(kredit_report[dates[date]][0]) + "</td><td>" +
+               currencyFormatDE(kredit_report[dates[date]][1]) + "</td><td>" +
+               currencyFormatDE(kredit_report[dates[date]][2]) + "</td></tr>"
+             //console.log(dates[date])
+             //console.log(kredit_report[dates[date]])
+           }
+           txt_rep004 += "<tr><th>Total</th><th>" +
+             currencyFormatDE(kredite) + "</th><th>" +
+             currencyFormatDE(erw_zinsaufwand) + "</th><th>" +
+             currencyFormatDE(kredite + erw_zinsaufwand) + "</th></tr></table>"
+             
+           document.getElementById("info004").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+           document.getElementById("rep_004_liabilities").innerHTML = txt_rep004
+         
+         };
+
+         function report005_systembank_bilanz(data){
+           var kredite = 0;
+           var zinsen = 0;
+           var anleihen = 0;
+           var erw_zinsaufwand = 0;
+           var ag;
+           var aktien;
+           var wkn;
+           var loan;
+           var aktien_depot = {};
+           var ag_liste = [];
+           var kredit_buch = {};
+           var kredit_report = {};
+           var dates = [];
+           var datum;
+           for (ag in data.ags){
+             //console.log(ag_liste)
+            if (ag_liste.indexOf(ag) == -1){
+             //console.log("ag unknown")
+              ag_liste.push(ag)
+              aktien_depot[ag] = {"anzahl":data["ags"][ag]["aktienanzahl"],
+                "kurs":data["ags"][ag]["kurs"],
+                "name":data["ags"][ag]["name"],
+                "cnt_gehalten_durch_ags":0}
+            }
+            else{
+              //console.log("ag known")
+              aktien_depot[ag]["anzahl"] = data["ags"][ag]["aktienanzahl"];
+              aktien_depot[ag]["kurs"] = data["ags"][ag]["kurs"];
+              aktien_depot[ag]["name"] = data["ags"][ag]["name"];
+            }
+
+            aktien = data["ags"][ag]["aktien"];
+            //console.log(aktien)
+            for (wkn in aktien){
+              //console.log(ag_liste)
+              //console.log(ag, wkn, aktien[wkn]["wkn"])
+              //console.log(aktien_depot)
+              if (ag_liste.indexOf(aktien[wkn]["wkn"].toString()) == -1){
+              
+               ag_liste.push(aktien[wkn]["wkn"].toString())
+               aktien_depot[aktien[wkn]["wkn"]] = {"anzahl":data["ags"][aktien[wkn]["wkn"]]["aktienanzahl"],
+                "kurs":data["ags"][aktien[wkn]["wkn"]]["kurs"],
+                "name":data["ags"][aktien[wkn]["wkn"]]["name"],
+                "cnt_gehalten_durch_ags":aktien[wkn]["stueckzahl"]}
+               
+             }
+             else{
+              aktien_depot[aktien[wkn]["wkn"]]["cnt_gehalten_durch_ags"] += aktien[wkn]["stueckzahl"]; 
+               
+             
+             }
+             //console.log(aktien_depot)
+            }
+           
+           }
+           console.log(aktien_depot)
+           var sum_aktien = 0;
+           var sum_wert = 0;
+           var wert = 0;
+           var txt_rep005;
+           txt_rep005 = "<table>"
+           txt_rep005 += "<tr><th>WKN</th><th>Name</th><th>Anzahl Aktien</th><th>Wert</th><th>Anteil</th></tr>" 
+           for (wkn in ag_liste.sort()){
+              wert = (aktien_depot[ag_liste[wkn]]["anzahl"] - aktien_depot[ag_liste[wkn]]["cnt_gehalten_durch_ags"])*aktien_depot[ag_liste[wkn]]["kurs"];
+              sum_aktien += aktien_depot[ag_liste[wkn]]["anzahl"] - aktien_depot[ag_liste[wkn]]["cnt_gehalten_durch_ags"];
+              sum_wert += wert;
+             //console.log(date, dates[date],kredit_report[dates[date]])
+             if (aktien_depot[ag_liste[wkn]]["anzahl"] != aktien_depot[ag_liste[wkn]]["cnt_gehalten_durch_ags"]){
+             txt_rep005 += "<tr><td>"+ag_liste[wkn]+"</td><td>"+
+               aktien_depot[ag_liste[wkn]]["name"] + "</td><td>" +
+                (aktien_depot[ag_liste[wkn]]["anzahl"] - aktien_depot[ag_liste[wkn]]["cnt_gehalten_durch_ags"]).toLocaleString("de") + "</td><td>" +
+               currencyFormatDE(wert) + "</td><td>" +
+                ((aktien_depot[ag_liste[wkn]]["anzahl"] - aktien_depot[ag_liste[wkn]]["cnt_gehalten_durch_ags"])/aktien_depot[ag_liste[wkn]]["anzahl"]*100).toFixed(2)+" %</td></tr>"
+             }
+             //console.log(dates[date])
+             //console.log(kredit_report[dates[date]])
+           }
+           txt_rep005 += "<tr><th>Total</th><th>" +
+             "" + "</th><th>" +
+             sum_aktien.toLocaleString("de") + "</th><th>" +
+             currencyFormatDE(sum_wert) + "</th><th></th></tr></table>"
+             
+           document.getElementById("info005").innerHTML = "Zuletzt aktualisiert: " + data.daten_datum;
+           document.getElementById("rep_005_depot_systembank").innerHTML = txt_rep005
+         
+         };
+         var xmlhttp = new XMLHttpRequest();
+           var data;
+           xmlhttp.onreadystatechange = function() {
+             if (this.readyState == 4 && this.status == 200) {
+               data = JSON.parse(this.responseText);
+               //return data;
+               report000_markt(data);
+               report001_anleihebuch(data);
+               report002_low_spreads(data);
+               report003_low_valuation(data);
+               report004_kreditbuch(data);
+               report005_systembank_bilanz(data)
+             }
+           };
+           // FIXME request to Rady to include "Access-Control-Allow-Origin: *" in the response header
+           xmlhttp.open("GET", "https://cors-anywhere.herokuapp.com/https://www.ag-spiel.de/api/get/data.php", true);
+           xmlhttp.send();
+           
+           
+      </script>
+   </body>
+</html>
